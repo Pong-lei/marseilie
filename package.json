@@ -7,10 +7,18 @@
     "build": "vue-cli-service build"
   },
   "dependencies": {
-    "core-js": "^3.6.5",
-    "vue": "^2.6.11"
+    "core-js": "^3.22.8",
+    "dat.gui": "^0.7.9",
+    "geolib": "^3.3.3",
+    "gsap": "^3.10.4",
+    "raw-loader": "^4.0.2",
+    "stats.js": "^0.17.0",
+    "three": "^0.141.0",
+    "vue": "^2.6.11",
+    "vue-router": "^3.0.2"
   },
   "devDependencies": {
+    "@types/three": "^0.141.0",
     "@vue/cli-plugin-babel": "~4.5.13",
     "@vue/cli-service": "~4.5.13",
     "vue-template-compiler": "^2.6.11"
