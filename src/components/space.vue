@@ -1,5 +1,15 @@
 <template>
   <div id="space" ref="space">
+    <div id="back">返回</div>
+    <div id="load">
+      <div>G</div>
+      <div>N</div>
+      <div>I</div>
+      <div>D</div>
+      <div>A</div>
+      <div>O</div>
+      <div>L</div>
+    </div>
     <div id="cont" ref="cont"></div>
   </div>
 </template>
@@ -8,16 +18,17 @@
 import * as THREE from "three";
 import Dat from "dat.gui";
 import { getDistance, getRhumbLineBearing } from "geolib";
-// import gsap from "gsap";
+import gsap from "gsap";
 import Stats from "stats.js";
+// import texture1 from "../assets/ballroom_2k.hdr"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { mergeBufferGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 // import { Water } from "three/examples/jsm/objects/Water";
 import edingburgh from "../assets/edingbur.json";
 // import edingburgh_water from "../assets/edingbur_water.json";
 
-import vertex from "../shader/vertexParticles.glsl";
-import fragment from "../shader/fargment.glsl";
+// import Roomvertex from "../shader/insideRoom/vertexParticles.glsl";
+// import Roomfragment from "../shader/insideRoom/fargment.glsl";
 
 export default {
   name: "space",
@@ -33,11 +44,14 @@ export default {
 
       scene: null,
       camera: null,
+
       renderer: null,
       controls: null,
+      controls360: null,
       center: [-3.190462, 55.9443966],
 
       BUILDING_MATERIAL: null,
+      GONE_MATERIAL: null,
       LINE_MATERIAL: null,
       DASH_LINE_MATERIAL: null,
       WATER_MATERIAL: null,
@@ -57,46 +71,138 @@ export default {
       allLineGeometry: [],
       collider: [],
 
+      meshSpher: null,
+
       all_lines_points: [],
 
       FLAG_LINE_ANI: true,
 
       // destory
       reqAninFrame: null,
-      buildingColor: {
+      goneColor: {
         color: "#fff000",
       },
+      goneCoor: [
+        [1.9, 0.8, -0.4, "爱丁堡大学"],
+        [-1.7, 0.3, 3, "塔尔伯画廊"],
+        [-2.8, 0.3, 0, "爱丁堡旧址"],
+        [-4.2, 0.3, -5.5, "爱丁堡博物馆"],
+        [4.7, 0.5, -9.1, "皇家英邦游泳池"],
+        [0.8, 0.5, -6.3, "警察局"],
+        [6, 0.5, 4.3, "公园"],
+      ],
+
+      mapGorup: null,
+      roomGorup: null,
+
+      texture1: null,
+      texture2: null,
     };
   },
   mounted() {
     this.Init();
+    this.CreataSphere();
     this.onWindowResize();
     window.addEventListener("resize", this.onWindowResize.bind(this));
-    this.$refs.cont.addEventListener("click", this.goRouter);
+    this.$refs.cont.addEventListener("click", this.goRoom);
+    this.Tick();
   },
   methods: {
-    goRouter(event) {
-      let pointer = {};
+    goRoom(event) {
+      let pointer = new THREE.Vector2();
       pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
       pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
       let hitted = this.Launch(pointer);
-      // let dom = this.$refs.space;
-      // gsap.to(dom, {
-      //   duration: 2,
-      //   scale: 0.1,
-      //   onComplete: () => {
-
-      //   },
-      // });
-      // this.$router.push({ path: "/inside" });
+      if (hitted) {
+        if (
+          hitted.name === "爱丁堡大学" ||
+          hitted.name === "爱丁堡旧址" ||
+          hitted.name === "皇家英邦游泳池"
+        ) {
+          // console.log(hitted);
+          this.meshSpher.material.map = this.texture1;
+        } else {
+          // console.log(hitted);
+          this.meshSpher.material.map = this.texture2;
+        }
+        let timeLine = gsap.timeline();
+        this.GoneGorup.traverse((ch) => {
+          if (ch.isMesh) {
+            ch.material.color = new THREE.Color(0x0c9393);
+          }
+        });
+        timeLine
+          .to(hitted.material.color, {
+            direction: 2,
+            r: 0.8,
+            g: 0.1,
+            b: 0.4,
+          })
+          .to(
+            "#load",
+            {
+              duration: 2,
+              opacity: 1,
+              onStart: () => {
+                this.mapGorup.visible = false;
+                this.GoneGorup.visible = false;
+              },
+            },
+            "<+1.5"
+          )
+          .to(
+            "#load",
+            {
+              duration: 1,
+              opacity: 0,
+              onStart: () => {
+                this.roomGorup.visible = true;
+                this.$refs.cont.removeEventListener("click", this.goRoom);
+                this.controls.enableZoom = false;
+                this.controls.enablePan = false;
+                let btn = document.querySelector("#back");
+                btn.style.transform = "scale(1)";
+                btn.addEventListener("click", () => {
+                  this.roomGorup.visible = false;
+                  this.controls.enableZoom = true;
+                  this.controls.enablePan = true;
+                  this.mapGorup.visible = true;
+                  this.GoneGorup.visible = true;
+                  btn.style.transform = "scale(0)";
+                  this.$refs.cont.addEventListener("click", this.goRoom);
+                });
+              },
+            },
+            ">+2"
+          );
+      }
     },
     onWindowResize() {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
     },
+    CreataSphere() {
+      let sphere = new THREE.SphereGeometry(30, 30, 30);
+      this.texture1 = new THREE.TextureLoader().load(
+        require("../assets/texture1.png")
+      );
+      this.texture2 = new THREE.TextureLoader().load(
+        require("../assets/texture2.png")
+      );
 
+      this.meshSpher = new THREE.Mesh(
+        sphere,
+        new THREE.MeshBasicMaterial({
+          side: THREE.BackSide,
+          map: this.texture1,
+        })
+      );
+
+      this.roomGorup.add(this.meshSpher);
+      this.roomGorup.visible = false;
+    },
     Init() {
       let cont = this.$refs.cont;
 
@@ -113,11 +219,24 @@ export default {
       this.dash_lines = new THREE.Group();
       this.dash_lines.name = "AnimatedLine";
 
+      this.mapGorup = new THREE.Group();
+      this.mapGorup.name = "mapGroup";
+
+      this.GoneGorup = new THREE.Group();
+      this.GoneGorup.name = "GoneGroup";
+
+      this.roomGorup = new THREE.Group();
+      this.roomGorup.name = "roomGroup";
+
+      this.mapGorup.add(this.dash_lines);
+
       // this.lines_water = new THREE.Group();
       // this.lines_water.name = "Water";
 
       this.$nextTick(() => {
-        this.scene.add(this.dash_lines);
+        this.scene.add(this.mapGorup);
+        this.scene.add(this.GoneGorup);
+        this.scene.add(this.roomGorup);
         // this.scene.add(this.lines_water);
       });
 
@@ -128,8 +247,8 @@ export default {
         0.1,
         1000
       );
-      // this.camera.position.set(10, 4, 0);
       this.camera.position.set(8, 4, -4);
+      // this.camera.position.set(0, 8, 0);
       // this.camera.lookAt(new THREE.Vector3(10,10,10));
 
       // light
@@ -139,9 +258,9 @@ export default {
       light1.position.set(200, 90, 40);
       light2.position.set(200, 90, -40);
 
-      this.scene.add(light0);
-      this.scene.add(light1);
-      this.scene.add(light2);
+      this.mapGorup.add(light0);
+      this.mapGorup.add(light1);
+      this.mapGorup.add(light2);
 
       // renderer
       this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -160,37 +279,36 @@ export default {
       this.controls.update();
 
       // this.scene.add(new THREE.AxesHelper(5));
-      // tick
 
+      this.BUILDING_MATERIAL = new THREE.MeshPhongMaterial();
 
-// 55.943136 -3.187468
-// 55.947075 -3.189286
-// 55.945963 -3.194759
-// 55.948234 -3.180448
-// 55.943623 -3.1790222
-// 55.940147, -3.1750203
-// 55.939153, -3.1939592
-      this.BUILDING_MATERIAL = new THREE.MeshPhongMaterial({
-        color: 0xffad8f,
-      });
-      // this.gui.addColor(this.buildingColor, "color").onChange(() => {
-      //   this.BUILDING_MATERIAL.color = new THREE.Color(
-      //     this.buildingColor.color
-      //   );
-      // });
       // 路线的实线材质
       this.LINE_MATERIAL = new THREE.LineBasicMaterial({ color: 0x254360 });
 
       this.getCityJson();
-      this.Tick();
+      this.createConeGeo();
 
       // 地图太小 没有水
       // this.LoadWaters();
       // setInterval(this.UpdateAnimatedLine, 3000);
     },
+    createConeGeo() {
+      const geometry = new THREE.ConeGeometry(0.1, 0.4, 3, 1);
+      for (let index = 0; index < this.goneCoor.length; index++) {
+        const element = this.goneCoor[index];
+
+        const material = new THREE.MeshPhongMaterial({ color: 0x0c9393 });
+        const cone = new THREE.Mesh(geometry, material);
+        cone.rotateX(Math.PI);
+        cone.name = element[3];
+        cone.position.set(element[0], element[1], element[2]);
+
+        this.GoneGorup.add(cone);
+      }
+    },
     Launch(mouse) {
       this.raycaster.setFromCamera(mouse, this.camera);
-      let intersects = this.raycaster.intersectObjects(this.collider, true);
+      let intersects = this.raycaster.intersectObjects(this.GoneGorup.children);
       if (intersects.length > 0) {
         return intersects[0].object;
       }
@@ -199,10 +317,16 @@ export default {
     Tick() {
       this.stats.begin();
       this.time++;
+      this.GoneGorup.traverse((ch) => {
+        if (ch.isMesh) {
+          ch.rotateY(Math.PI / 150);
+        }
+      });
       this.renderer.render(this.scene, this.camera);
       this.UpdateAnimatedLine();
       // if (this.READY) {
       //   this.updateThings();
+      
       // }
 
       this.stats.end();
@@ -271,7 +395,7 @@ export default {
           item.dispose();
         });
         Line_geometrys.dispose();
-        that.scene.add(mesh);
+        that.mapGorup.add(mesh);
       });
     },
 
@@ -365,7 +489,7 @@ export default {
       // this.particleGeometry = geometry;
 
       this.READY = true;
-      this.scene.add(plane);
+      this.mapGorup.add(plane);
       return geometry;
     },
     addWater(data) {
@@ -446,7 +570,7 @@ export default {
       geometry.rotateX(-Math.PI / 2);
 
       const splineObject = new THREE.Line(geometry, this.LINE_MATERIAL);
-      this.scene.add(splineObject);
+      this.mapGorup.add(splineObject);
 
       this.computeLineDistances(geometry);
 
@@ -543,13 +667,13 @@ export default {
       this.allBuildings.push(geometry);
 
       // helper
-      let helper = this.getHelper(geometry);
+      // let helper = this.getHelper(geometry);
 
-      if (helper) {
-        helper.name = info[`name`] ? info[`name`] : "Building";
-        helper.info = info;
-        this.collider.push(helper);
-      }
+      // if (helper) {
+      //   helper.name = info[`name`] ? info[`name`] : "Building";
+      //   helper.info = info;
+      //   this.collider.push(helper);
+      // }
     },
     getHelper(geometry) {
       if (!geometry.boundingBox) {
@@ -612,7 +736,6 @@ export default {
 
     this.renderer.dispose();
     this.renderer.forceContextLoss();
-    console.log(this.renderer.info);
     this.renderer.domElement = null;
     this.renderer = null;
   },
@@ -620,4 +743,120 @@ export default {
 </script>
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
-<style scoped></style>
+<style scoped>
+#load {
+  position: absolute;
+  width: 600px;
+  height: 36px;
+  left: 50%;
+  top: 40%;
+  opacity: 0;
+  margin-left: -300px;
+  overflow: visible;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+#load div {
+  position: absolute;
+  width: 20px;
+  height: 36px;
+  /* opacity:0; */
+  font-family: Helvetica, Arial, sans-serif;
+  animation: move 2s linear infinite;
+  -o-animation: move 2s linear infinite;
+  -moz-animation: move 2s linear infinite;
+  -webkit-animation: move 2s linear infinite;
+  transform: rotate(180deg);
+  -o-transform: rotate(180deg);
+  -moz-transform: rotate(180deg);
+  -webkit-transform: rotate(180deg);
+  color: #35c4f0;
+}
+
+#load div:nth-child(2) {
+  animation-delay: 0.2s;
+  -o-animation-delay: 0.2s;
+  -moz-animation-delay: 0.2s;
+  -webkit-animation-delay: 0.2s;
+}
+#load div:nth-child(3) {
+  animation-delay: 0.4s;
+  -o-animation-delay: 0.4s;
+  -webkit-animation-delay: 0.4s;
+  -webkit-animation-delay: 0.4s;
+}
+#load div:nth-child(4) {
+  animation-delay: 0.6s;
+  -o-animation-delay: 0.6s;
+  -moz-animation-delay: 0.6s;
+  -webkit-animation-delay: 0.6s;
+}
+#load div:nth-child(5) {
+  animation-delay: 0.8s;
+  -o-animation-delay: 0.8s;
+  -moz-animation-delay: 0.8s;
+  -webkit-animation-delay: 0.8s;
+}
+#load div:nth-child(6) {
+  animation-delay: 1s;
+  -o-animation-delay: 1s;
+  -moz-animation-delay: 1s;
+  -webkit-animation-delay: 1s;
+}
+#load div:nth-child(7) {
+  animation-delay: 1.2s;
+  -o-animation-delay: 1.2s;
+  -moz-animation-delay: 1.2s;
+  -webkit-animation-delay: 1.2s;
+}
+@keyframes move {
+  0% {
+    left: 0;
+    /* opacity:0; */
+  }
+  35% {
+    left: 41%;
+    -moz-transform: rotate(0deg);
+    -webkit-transform: rotate(0deg);
+    -o-transform: rotate(0deg);
+    transform: rotate(0deg);
+    /* opacity:1; */
+  }
+  65% {
+    left: 59%;
+    -moz-transform: rotate(0deg);
+    -webkit-transform: rotate(0deg);
+    -o-transform: rotate(0deg);
+    transform: rotate(0deg);
+    /* opacity:1; */
+  }
+  100% {
+    left: 100%;
+    -moz-transform: rotate(-180deg);
+    -webkit-transform: rotate(-180deg);
+    -o-transform: rotate(-180deg);
+    transform: rotate(-180deg);
+    /* opacity:0; */
+  }
+}
+#back {
+  position: absolute;
+  background-color: aqua;
+  font-family: "Arial", "Microsoft YaHei", "黑体", "宋体", sans-serif;
+  padding: 5px 10px;
+  top: 10px;
+  left: 7%;
+  border-radius: 25px;
+  font-size: 12px;
+  color: #ffffff;
+  font-weight: bold;
+  cursor: pointer;
+  transform: scale(0);
+  transition: transform 1s;
+  /* transform: translateX(-50%); */
+}
+</style>
