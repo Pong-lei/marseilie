@@ -161,6 +161,7 @@ export default {
                 this.$refs.cont.removeEventListener("click", this.goRoom);
                 this.controls.enableZoom = false;
                 this.controls.enablePan = false;
+                this.controls.saveState()
                 let btn = document.querySelector("#back");
                 btn.style.transform = "scale(1)";
                 btn.addEventListener("click", () => {
@@ -171,6 +172,7 @@ export default {
                   this.GoneGorup.visible = true;
                   btn.style.transform = "scale(0)";
                   this.$refs.cont.addEventListener("click", this.goRoom);
+                  this.controls.reset()
                 });
               },
             },
@@ -326,7 +328,7 @@ export default {
       this.UpdateAnimatedLine();
       // if (this.READY) {
       //   this.updateThings();
-      
+
       // }
 
       this.stats.end();

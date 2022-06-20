@@ -1,11 +1,14 @@
 <template>
-  <router-view />
+  <space />
 </template>
 
 <script>
+import space from "./components/space.vue";
 export default {
   name: "App",
-  components: {},
+  components: {
+    space,
+  },
 };
 </script>
 
