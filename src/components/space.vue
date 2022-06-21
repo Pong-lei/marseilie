@@ -97,60 +97,146 @@ export default {
 
       texture1: null,
       texture2: null,
+      currentHitted: null,
+      lastHitted: null,
     };
   },
   mounted() {
     this.Init();
     this.CreataSphere();
-    this.onWindowResize();
-    window.addEventListener("resize", this.onWindowResize.bind(this));
-    this.$refs.cont.addEventListener("click", this.goRoom);
-    this.Tick();
+    this.enterSpace();
+    this.onWindowResize()
+    this.$nextTick(() => {
+      window.addEventListener("resize", this.onWindowResize.bind(this));
+      this.$refs.cont.addEventListener("mousemove", this.mouseMove);
+      this.$refs.cont.addEventListener("click", this.goRoom);
+      this.Tick();
+    });
   },
   methods: {
+    enterSpace() {
+      let timeline = gsap.timeline();
+      this.camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+      timeline
+        .from(this.camera.rotation, {
+          duration: 8,
+          x: this.camera.rotation.x - 0.1,
+          y: this.camera.rotation.y + 0.8,
+          onStart: () => {
+            this.controls.enabled = false;
+          },
+          onComplete: () => {
+            this.controls.enabled = true;
+          },
+        })
+        .from(
+          this.camera.position,
+          {
+            duration: 8,
+            x: 20,
+          },
+          "<"
+        );
+    },
+    mouseMove(event) {
+      let pointer = new THREE.Vector2();
+      pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      let timeLine = gsap.timeline();
+      this.currentHitted = this.Launch(pointer);
+      if (this.currentHitted) {
+        timeLine
+          .to(this.currentHitted.scale, {
+            duration: 0.6,
+            x: 0.7,
+            y: 0.7,
+            z: 0.7,
+          })
+          .to(
+            this.currentHitted.attachRing.material,
+            {
+              duration: 0.6,
+              opacity: 1,
+            },
+            "<"
+          )
+          .to(
+            this.currentHitted.attachRing.rotation,
+            {
+              duration: 0.6,
+              z: Math.PI,
+              onStart: () => {
+                this.currentHitted.attachRing.lookAt(this.camera.position);
+              },
+            },
+            "<"
+          );
+
+        this.lastHitted = this.currentHitted;
+      } else {
+        if (this.lastHitted) {
+          timeLine
+            .to(this.lastHitted.scale, {
+              duration: 0.6,
+              x: 1,
+              y: 1,
+              z: 1,
+            })
+            .to(
+              this.lastHitted.attachRing.material,
+              {
+                duration: 0.6,
+                opacity: 0,
+                onComplete: () => {
+                  this.lastHitted.attachRing.rotation.z = -Math.PI;
+                  // this.lastHitted = null;
+                },
+              },
+              "<"
+            );
+        }
+      }
+    },
     goRoom(event) {
       let pointer = new THREE.Vector2();
       pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
       pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-      let hitted = this.Launch(pointer);
-      if (hitted) {
+      if (this.currentHitted) {
         if (
-          hitted.name === "爱丁堡大学" ||
-          hitted.name === "爱丁堡旧址" ||
-          hitted.name === "皇家英邦游泳池"
+          this.currentHitted.name === "爱丁堡大学_cone" ||
+          this.currentHitted.name === "爱丁堡旧址_cone" ||
+          this.currentHitted.name === "皇家英邦游泳池_cone"
         ) {
-          // console.log(hitted);
           this.meshSpher.material.map = this.texture1;
         } else {
-          // console.log(hitted);
+          console.log(this.currentHitted.name);
           this.meshSpher.material.map = this.texture2;
         }
         let timeLine = gsap.timeline();
+
         this.GoneGorup.traverse((ch) => {
           if (ch.isMesh) {
             ch.material.color = new THREE.Color(0x0c9393);
           }
         });
         timeLine
-          .to(hitted.material.color, {
-            direction: 2,
+          .to(this.currentHitted.material.color, {
+            duration: 2,
             r: 0.8,
             g: 0.1,
             b: 0.4,
           })
-          .to(
-            "#load",
-            {
-              duration: 2,
-              opacity: 1,
-              onStart: () => {
-                this.mapGorup.visible = false;
-                this.GoneGorup.visible = false;
-              },
+          .to("#load", {
+            duration: 2,
+            opacity: 1,
+            onStart: () => {
+              this.mapGorup.visible = false;
+              this.GoneGorup.visible = false;
             },
-            "<+1.5"
-          )
+          })
           .to(
             "#load",
             {
@@ -159,9 +245,14 @@ export default {
               onStart: () => {
                 this.roomGorup.visible = true;
                 this.$refs.cont.removeEventListener("click", this.goRoom);
+                this.$refs.cont.removeEventListener(
+                  "mousemove",
+                  this.mouseMove
+                );
+
                 this.controls.enableZoom = false;
                 this.controls.enablePan = false;
-                this.controls.saveState()
+                this.controls.saveState();
                 let btn = document.querySelector("#back");
                 btn.style.transform = "scale(1)";
                 btn.addEventListener("click", () => {
@@ -172,7 +263,8 @@ export default {
                   this.GoneGorup.visible = true;
                   btn.style.transform = "scale(0)";
                   this.$refs.cont.addEventListener("click", this.goRoom);
-                  this.controls.reset()
+                  this.$refs.cont.addEventListener("mousemove", this.mouseMove);
+                  this.controls.reset();
                 });
               },
             },
@@ -186,12 +278,12 @@ export default {
       this.renderer.setSize(window.innerWidth, window.innerHeight);
     },
     CreataSphere() {
-      let sphere = new THREE.SphereGeometry(30, 30, 30);
+      let sphere = new THREE.SphereGeometry(40, 30, 30);
       this.texture1 = new THREE.TextureLoader().load(
-        require("../assets/texture1.png")
+        require("../assets/texture1.jpg")
       );
       this.texture2 = new THREE.TextureLoader().load(
-        require("../assets/texture2.png")
+        require("../assets/texture2.jpg")
       );
 
       this.meshSpher = new THREE.Mesh(
@@ -215,7 +307,7 @@ export default {
       document.body.appendChild(this.stats.dom);
       // scene
       this.scene = new THREE.Scene();
-      this.scene.background = new THREE.Color(0x2222222);
+      this.scene.background = new THREE.Color("#6E7786");
 
       //init group
       this.dash_lines = new THREE.Group();
@@ -244,19 +336,19 @@ export default {
 
       // camera
       this.camera = new THREE.PerspectiveCamera(
-        50,
+        40,
         window.clientWith / window.clientHight,
         0.1,
         1000
       );
       this.camera.position.set(8, 4, -4);
       // this.camera.position.set(0, 8, 0);
-      // this.camera.lookAt(new THREE.Vector3(10,10,10));
+      this.camera.lookAt(new THREE.Vector3(0));
 
       // light
       let light0 = new THREE.AmbientLight(0xfafafa, 0.25);
-      let light1 = new THREE.DirectionalLight(0xfafafa, 0.4);
-      let light2 = new THREE.DirectionalLight(0xfafafa, 0.4);
+      let light1 = new THREE.DirectionalLight(0xfafafa, 3);
+      let light2 = new THREE.DirectionalLight(0xfafafa, 3);
       light1.position.set(200, 90, 40);
       light2.position.set(200, 90, -40);
 
@@ -268,8 +360,8 @@ export default {
       this.renderer = new THREE.WebGLRenderer({ antialias: true });
       this.renderer.setPixelRatio(window.devicePixelRatio);
       this.renderer.setSize(window.innerWidth, window.innerHeight);
-      // this.renderer.physicallyCorrectLights = true
-      this.renderer.outputEncoding = THREE.sRGBEncoding;
+      this.renderer.physicallyCorrectLights = true;
+      // this.renderer.outputEncoding = THREE.sRGBEncoding;
       cont.appendChild(this.renderer.domElement);
 
       // controls map
@@ -278,6 +370,7 @@ export default {
       this.controls.dampingFactor = 0.25;
       this.controls.screenSpacePanning = false;
       this.controls.maxDistance = 16;
+
       this.controls.update();
 
       // this.scene.add(new THREE.AxesHelper(5));
@@ -296,23 +389,49 @@ export default {
     },
     createConeGeo() {
       const geometry = new THREE.ConeGeometry(0.1, 0.4, 3, 1);
+      const ring = new THREE.RingGeometry(
+        0.8,
+        0.5,
+        32,
+        1,
+        -Math.PI / 2 - 0.1,
+        Math.PI * 1.99
+      );
+
       for (let index = 0; index < this.goneCoor.length; index++) {
         const element = this.goneCoor[index];
 
         const material = new THREE.MeshPhongMaterial({ color: 0x0c9393 });
+        const Ringmaterial = new THREE.MeshBasicMaterial({
+          color: 0x0c9393,
+          side: THREE.DoubleSide,
+          transparent: true,
+          depthTest: false,
+          depthWrite: false,
+        });
+        Ringmaterial.opacity = 0;
         const cone = new THREE.Mesh(geometry, material);
+        const ringMesh = new THREE.Mesh(ring, Ringmaterial);
         cone.rotateX(Math.PI);
-        cone.name = element[3];
+        cone.name = element[3] + "_cone";
+        cone.attachRing = ringMesh;
+        ringMesh.rotateX(Math.PI);
+        ringMesh.name = element[3] + "_ring";
+        ringMesh.renderOrder = 99;
         cone.position.set(element[0], element[1], element[2]);
+        ringMesh.position.set(element[0], element[1], element[2]);
 
         this.GoneGorup.add(cone);
+        this.GoneGorup.add(ringMesh);
       }
     },
     Launch(mouse) {
       this.raycaster.setFromCamera(mouse, this.camera);
       let intersects = this.raycaster.intersectObjects(this.GoneGorup.children);
       if (intersects.length > 0) {
-        return intersects[0].object;
+        if (intersects[0].object.name.indexOf("_cone") !== -1) {
+          return intersects[0].object;
+        }
       }
       return false;
     },
@@ -320,10 +439,11 @@ export default {
       this.stats.begin();
       this.time++;
       this.GoneGorup.traverse((ch) => {
-        if (ch.isMesh) {
+        if (ch.isMesh && ch.name.indexOf("_cone") !== -1) {
           ch.rotateY(Math.PI / 150);
         }
       });
+
       this.renderer.render(this.scene, this.camera);
       this.UpdateAnimatedLine();
       // if (this.READY) {
@@ -362,7 +482,6 @@ export default {
 
       for (let i = 0; i < features.length; i++) {
         let item = features[i];
-        this.randomNumber++;
         // get position
         let info = item.properties;
         if (!info) return;
@@ -566,7 +685,6 @@ export default {
         let elp = this.GPSRelativePositon([...data[i]], this.center);
         points.push(new THREE.Vector3(elp[0], elp[1], 0));
       }
-
       geometry.setFromPoints(points);
       geometry.rotateZ(Math.PI);
       geometry.rotateX(-Math.PI / 2);
@@ -634,7 +752,7 @@ export default {
           line.material.dashSize = 0;
           line.material.opacity = 1;
         } else {
-          line.material.dashSize += 0.02;
+          line.material.dashSize += 0.012;
           line.material.opacity =
             line.material.opacity > 0 ? line.material.opacity - 0.0002 : 0;
         }
@@ -660,7 +778,7 @@ export default {
       }
       geometry = this.getGeometry(shape, {
         curveSegment: 1,
-        depth: 0.05 * height,
+        depth: 0.05 * parseInt(height),
         bevelEnabled: false,
       });
       geometry.rotateX(Math.PI / 2);
@@ -692,7 +810,11 @@ export default {
     getGeometry(shape, config) {
       let geometry = new THREE.ExtrudeGeometry(shape, config);
       // Used to click
+      geometry.name = "222";
       geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
+
+      // console.log(geometry);
       return geometry;
     },
     getShape(points, info = {}) {

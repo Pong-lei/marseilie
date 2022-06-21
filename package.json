@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build"
+    "build": "vue-cli-service build",
+    "deploy": "vercel --prod"
   },
   "dependencies": {
     "core-js": "^3.22.8",
@@ -14,6 +15,7 @@
     "raw-loader": "^4.0.2",
     "stats.js": "^0.17.0",
     "three": "^0.141.0",
+    "vercel": "^25.1.0",
     "vue": "^2.6.11",
     "vue-router": "^3.0.2"
   },
